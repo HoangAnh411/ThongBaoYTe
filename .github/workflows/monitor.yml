@@ -8,6 +8,10 @@ on:
     branches:
       - main
 
+# 🔥 Cấp quyền cho GitHub Actions được phép push code lên repo
+permissions:
+  contents: write
+
 jobs:
   run-script:
     runs-on: ubuntu-latest
@@ -15,13 +19,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      # 🔥 Restore data.txt (tránh spam email)
-      - name: Restore previous data
-        uses: actions/cache@v4
-        with:
-          path: data.txt
-          key: data-file
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -31,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # 🔥 Run script với ENV
+      # 🔥 Chạy script với các biến môi trường
       - name: Run monitor script
         run: node monitor.js
         env:
@@ -40,12 +37,14 @@ jobs:
           EMAIL: ${{ secrets.EMAIL }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           RECEIVER: ${{ secrets.RECEIVER }}
+          GITHUB_ACTIONS: true # Đảm bảo script không chạy vòng lặp setInterval
 
-      # 🔥 Save lại data.txt
-      - name: Save new data
-        uses: actions/cache@v4
-        with:
-          path: data.txt
-          key: data-file-${{ github.run_id }}
-          restore-keys: |
-            data-file-
+      # 🔥 Tự động lưu trạng thái bằng cách commit data.txt
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data.txt
+          
+          # Kiểm tra xem file có thay đổi không. Nếu có thì commit với tag [skip ci] để tránh lặp vô hạn
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update data.txt [skip ci]" && git push)

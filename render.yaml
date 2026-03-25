@@ -1,9 +1,0 @@
-services:
-  - type: web
-    name: monitor-bot
-    env: node
-    buildCommand: |
-      apt-get update
-      apt-get install -y chromium
-      npm install
-    startCommand: npm start
