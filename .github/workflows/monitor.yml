@@ -32,7 +32,7 @@ jobs:
       - name: Run monitor script
         run: node monitor.js
         env:
-          USERNAME: ${{ secrets.USERNAME }}
+          ID: ${{ secrets.ID }}
           PASSWORD: ${{ secrets.PASSWORD }}
           EMAIL: ${{ secrets.EMAIL }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
