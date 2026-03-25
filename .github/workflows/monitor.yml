@@ -2,7 +2,7 @@ name: Monitor Website
 
 on:
   schedule:
-    - cron: "*/10 * * * *" # chạy mỗi 10 phút
+    - cron: "*/1 * * * *" # chạy mỗi 10 phút
   workflow_dispatch:
 
 jobs:
