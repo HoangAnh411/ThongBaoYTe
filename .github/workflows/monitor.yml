@@ -8,7 +8,6 @@ on:
     branches:
       - main
 
-# 🔥 Cấp quyền cho GitHub Actions được phép push code lên repo
 permissions:
   contents: write
 
@@ -26,9 +25,8 @@ jobs:
           node-version: "18"
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      # 🔥 Chạy script với các biến môi trường
       - name: Run monitor script
         run: node monitor.js
         env:
@@ -37,14 +35,24 @@ jobs:
           EMAIL: ${{ secrets.EMAIL }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           RECEIVER: ${{ secrets.RECEIVER }}
-          GITHUB_ACTIONS: true # Đảm bảo script không chạy vòng lặp setInterval
+          GITHUB_ACTIONS: true
 
-      # 🔥 Tự động lưu trạng thái bằng cách commit data.txt
-      - name: Commit and push changes
+      # 🔥 Commit ONLY data.txt nếu có thay đổi
+      - name: Commit and push data.txt
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # reset mọi thay đổi ngoài data.txt
+          git restore .
+
+          # force add data.txt (dù bị ignore)
           git add -f data.txt
-          
-          # Kiểm tra xem file có thay đổi không. Nếu có thì commit với tag [skip ci] để tránh lặp vô hạn
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update data.txt [skip ci]" && git push)
+
+          # chỉ commit nếu data.txt thay đổi
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update data.txt [skip ci]"
+            git push
+          fi
