@@ -2,7 +2,7 @@ name: Monitor Website
 
 on:
   schedule:
-    - cron: "*/10 * * * *" # mỗi 10 phút
+    - cron: "*/10 * * * *" # chạy mỗi 10 phút
   workflow_dispatch:
 
 jobs:
@@ -13,6 +13,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 🔥 Restore data.txt (tránh spam email)
+      - name: Restore previous data
+        uses: actions/cache@v4
+        with:
+          path: data.txt
+          key: data-file
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -21,7 +28,8 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run script
+      # 🔥 Run script với ENV
+      - name: Run monitor script
         run: node monitor.js
         env:
           USERNAME: ${{ secrets.USERNAME }}
@@ -29,3 +37,10 @@ jobs:
           EMAIL: ${{ secrets.EMAIL }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           RECEIVER: ${{ secrets.RECEIVER }}
+
+      # 🔥 Save lại data.txt
+      - name: Save new data
+        uses: actions/cache@v4
+        with:
+          path: data.txt
+          key: data-file
