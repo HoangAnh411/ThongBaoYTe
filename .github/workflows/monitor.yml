@@ -1,0 +1,31 @@
+name: Monitor Website
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # mỗi 10 phút
+  workflow_dispatch:
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run script
+        run: node monitor.js
+        env:
+          USERNAME: ${{ secrets.USERNAME }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          EMAIL: ${{ secrets.EMAIL }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          RECEIVER: ${{ secrets.RECEIVER }}
