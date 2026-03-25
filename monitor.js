@@ -32,7 +32,7 @@ async function sendEmail(message) {
 // ===== LOGIN + LẤY DATA =====
 async function getData() {
   const browser = await puppeteer.launch({
-    headless: false, // chạy ổn rồi thì đổi true
+    headless: true, // chạy ổn rồi thì đổi true
     slowMo: 50,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
