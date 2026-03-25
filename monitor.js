@@ -5,10 +5,11 @@ const fs = require("fs");
 
 // ===== CONFIG =====
 const URL = "https://gs.vadp.gov.vn/Account/Login";
+const DATA_FILE = "data.txt";
 
 // ===== DEBUG ENV =====
-console.log("ENV USER:", process.env.ID);
-console.log("ENV PASS:", process.env.PASSWORD);
+console.log("ENV USER:", process.env.ID || "❌ undefined");
+console.log("ENV PASS:", process.env.PASSWORD ? "✅ loaded" : "❌ undefined");
 
 // ===== EMAIL =====
 const transporter = nodemailer.createTransport({
@@ -21,86 +22,91 @@ const transporter = nodemailer.createTransport({
 
 // ===== GỬI EMAIL =====
 async function sendEmail(message) {
-  await transporter.sendMail({
-    from: process.env.EMAIL,
-    to: process.env.RECEIVER,
-    subject: "🚨 Có cập nhật mới từ hệ thống",
-    text: message,
-  });
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL,
+      to: process.env.RECEIVER,
+      subject: "🚨 Có cập nhật mới từ hệ thống",
+      text: message,
+    });
+    console.log("📩 Đã gửi email");
+  } catch (err) {
+    console.error("❌ Lỗi gửi email:", err.message);
+  }
 }
 
 // ===== LOGIN + LẤY DATA =====
 async function getData() {
-  const browser = await puppeteer.launch({
-    headless: true, // chạy ổn rồi thì đổi true
-    slowMo: 50,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
-
-  const page = await browser.newPage();
-
-  await page.goto(URL, {
-    waitUntil: "networkidle2",
-  });
-
-  // ===== LOGIN =====
-  await page.waitForSelector("input[name='username']");
-
-  // clear + nhập username
-  await page.click("input[name='username']", { clickCount: 3 });
-  await page.keyboard.press("Backspace");
-  await page.type("input[name='username']", process.env.ID, { delay: 50 });
-
-  // clear + nhập password
-  await page.waitForSelector("input[name='password']");
-  await page.click("input[name='password']", { clickCount: 3 });
-  await page.keyboard.press("Backspace");
-  await page.type("input[name='password']", process.env.PASSWORD, { delay: 50 });
-
-  // DEBUG xem nhập đúng chưa
-  const values = await page.evaluate(() => ({
-    user: document.querySelector("input[name='username']")?.value,
-    pass: document.querySelector("input[name='password']")?.value,
-  }));
-  console.log("👉 Đã nhập:", values);
-
-  // submit
-  await page.keyboard.press("Enter");
-
-  // ===== ĐỢI LOGIN =====
-  await new Promise((resolve) => setTimeout(resolve, 5000));
-
-  console.log("👉 URL sau login:", page.url());
-
-  // ===== LẤY THÔNG BÁO =====
-  let notificationCount = "0";
+  let browser;
 
   try {
-    // Sửa selector trỏ thẳng vào đúng icon bell
-    const badgeSelector = "#header_notification_bar .badge";
-    await page.waitForSelector(badgeSelector, { timeout: 10000 });
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+      ],
+    });
 
-    notificationCount = await page.$eval(badgeSelector, (el) =>
-      el.innerText.trim()
-    );
+    const page = await browser.newPage();
 
-    // Nếu span rỗng (không có text), gán về 0 để tránh lỗi so sánh logic
-    if (!notificationCount) {
-        notificationCount = "0";
+    // 👉 timeout global
+    page.setDefaultTimeout(15000);
+
+    console.log("🌐 Đang mở trang...");
+    await page.goto(URL, {
+      waitUntil: "networkidle2",
+      timeout: 30000,
+    });
+
+    // ===== LOGIN =====
+    console.log("🔐 Đang login...");
+
+    await page.waitForSelector("input[name='username']");
+    await page.type("input[name='username']", process.env.ID, { delay: 30 });
+
+    await page.waitForSelector("input[name='password']");
+    await page.type("input[name='password']", process.env.PASSWORD, { delay: 30 });
+
+    await Promise.all([
+      page.keyboard.press("Enter"),
+      page.waitForNavigation({ waitUntil: "networkidle2", timeout: 15000 }).catch(() => {}),
+    ]);
+
+    console.log("👉 URL sau login:", page.url());
+
+    // ===== LẤY THÔNG BÁO =====
+    let notificationCount = "0";
+
+    try {
+      const badgeSelector = "#header_notification_bar .badge";
+
+      await page.waitForSelector(badgeSelector, { timeout: 10000 });
+
+      notificationCount = await page.$eval(badgeSelector, (el) =>
+        el.innerText.trim()
+      );
+
+      if (!notificationCount) notificationCount = "0";
+
+      console.log("🎯 Số thông báo:", notificationCount);
+    } catch (e) {
+      console.log("⚠️ Không tìm thấy badge");
+
+      const html = await page.content();
+      fs.writeFileSync("debug.html", html);
+      console.log("👉 Đã lưu debug.html");
     }
 
-    console.log("🎯 Số thông báo:", notificationCount);
-  } catch (e) {
-    console.log("⚠️ Không tìm thấy badge");
-
-    // dump HTML để debug nếu cần
-    const html = await page.content();
-    fs.writeFileSync("debug.html", html);
-    console.log("👉 Đã lưu debug.html");
+    return notificationCount;
+  } catch (err) {
+    console.error("❌ Lỗi Puppeteer:", err.message);
+    return "0";
+  } finally {
+    if (browser) await browser.close();
   }
-
-  await browser.close();
-  return notificationCount;
 }
 
 // ===== SO SÁNH =====
@@ -111,34 +117,41 @@ async function checkChange() {
     const newData = await getData();
 
     let oldData = "0";
-    if (fs.existsSync("data.txt")) {
-      oldData = fs.readFileSync("data.txt", "utf-8");
+    if (fs.existsSync(DATA_FILE)) {
+      oldData = fs.readFileSync(DATA_FILE, "utf-8");
     }
 
     console.log("Old:", oldData);
     console.log("New:", newData);
 
-    if (!fs.existsSync("data.txt")) {
-      fs.writeFileSync("data.txt", newData);
+    // lần đầu chạy
+    if (!fs.existsSync(DATA_FILE)) {
+      fs.writeFileSync(DATA_FILE, newData);
+      console.log("📌 Lưu dữ liệu lần đầu");
       return;
     }
 
+    // chỉ gửi khi tăng
     if (parseInt(newData) > parseInt(oldData)) {
       console.log("🚨 Có thông báo mới!");
-
       await sendEmail(`Bạn có ${newData} thông báo mới!`);
-
-      fs.writeFileSync("data.txt", newData);
+      fs.writeFileSync(DATA_FILE, newData);
     } else {
       console.log("✅ Không có thông báo mới");
     }
   } catch (err) {
-    console.error("❌ Lỗi:", err.message);
+    console.error("❌ Lỗi checkChange:", err.message);
   }
 }
 
 // ===== CHẠY =====
 (async () => {
   await checkChange();
-  setInterval(checkChange, 10 * 60 * 1000);
+
+  // 👉 CHỈ loop khi chạy local (KHÔNG phải GitHub)
+  if (!process.env.GITHUB_ACTIONS) {
+    setInterval(checkChange, 10 * 60 * 1000);
+  } else {
+    console.log("✅ Done (GitHub Actions mode)");
+  }
 })();
