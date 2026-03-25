@@ -46,4 +46,6 @@ jobs:
         uses: actions/cache@v4
         with:
           path: data.txt
-          key: data-file
+          key: data-file-${{ github.run_id }}
+          restore-keys: |
+            data-file-
