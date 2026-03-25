@@ -42,6 +42,7 @@ async function getData() {
   try {
     browser = await puppeteer.launch({
       headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -150,7 +151,7 @@ async function checkChange() {
 
   // 👉 CHỈ loop khi chạy local (KHÔNG phải GitHub)
   if (!process.env.GITHUB_ACTIONS) {
-    setInterval(checkChange, 10 * 60 * 1000);
+    setInterval(checkChange, 5 * 60 * 1000);
   } else {
     console.log("✅ Done (GitHub Actions mode)");
   }
